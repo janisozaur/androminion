@@ -4,9 +4,7 @@ import java.util.ArrayList;
 
 import android.graphics.Color;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.AdapterView;
-import android.widget.AdapterView.OnItemClickListener;
+import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.GridView;
@@ -14,16 +12,15 @@ import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.mehtank.androminion.Androminion;
 import com.mehtank.androminion.R;
-import com.mehtank.androminion.activities.GameActivity;
-import com.mehtank.androminion.util.CardGroup;
 import com.vdom.comms.Event;
 import com.vdom.comms.Event.EventObject;
 
-public class OrderCardsView extends BottomInputView implements OnItemClickListener {
+public class OrderCardsView extends BottomInputView implements OnClickListener {
 	LinearLayout ll;
 	HorizontalScrollView hsv;
-
+	
 	CardGroup orig;
 	GridView origGV;
 	LinearLayout origCS;
@@ -31,16 +28,16 @@ public class OrderCardsView extends BottomInputView implements OnItemClickListen
 	CardGroup ordered;
 	GridView orderedGV;
 	LinearLayout orderedCS;
-
+	
 	DragNDropListView touch;
 	LinearLayout touchCS;
-
+	
 	Button select, reset;
 
 	int[] cards;
 	ArrayList<Integer> orderedCards = new ArrayList<Integer>();
 	ArrayList<Integer> origCards = new ArrayList<Integer>();
-
+		
 	void orderCardGroups() {
 		int[] cs = new int[origCards.size()];
 		for (int i=0; i<cs.length; i++)
@@ -51,30 +48,28 @@ public class OrderCardsView extends BottomInputView implements OnItemClickListen
 		for (int i=0; i<cs.length; i++)
 			cs[i] = cards[orderedCards.get(i)];
     	GameTableViews.newCardGroup(ordered, cs);
-
+    	
         canSelect();
 	}
-
-	public OrderCardsView (GameActivity top, String header, int[] cards) {
+	
+	public OrderCardsView (Androminion top, OnLongClickListener lc, String header, int[] cards) {
 		super(top, header);
 		this.top = top;
-
+		
 		this.cards = cards;
 		for (int i=0; i<cards.length; i++)
 			origCards.add(i);
-
-		orig = new CardGroup(top, false);
+		
+		orig = new CardGroup(top, this, lc, false);
     	origGV = GameTableViews.makeGV(top, orig, 1);
-    	origGV.setOnItemClickListener(this);
     	origCS = (GameTableViews.myCardSet(top, top.getString(R.string.cards), origGV, null));
-
-		ordered = new CardGroup(top, false);
+    	
+		ordered = new CardGroup(top, this, lc, false);
     	orderedGV = GameTableViews.makeGV(top, ordered, 1);
-    	orderedGV.setOnItemClickListener(this);
     	orderedCS = (GameTableViews.myCardSet(top, top.getString(R.string.top_of_deck), orderedGV, null));
-
+    	
         touch = new DragNDropListView (top);
-        touch.setLayoutParams(new LinearLayout.LayoutParams(CardView.WIDTH, ViewGroup.LayoutParams.WRAP_CONTENT));
+        touch.setLayoutParams(new LinearLayout.LayoutParams(CardView.WIDTH, LinearLayout.LayoutParams.WRAP_CONTENT));
         touch.setDropListener(new DragNDropListView.DragListener() {
 			@Override
 			public void onDrag(int from, int to) {
@@ -87,22 +82,22 @@ public class OrderCardsView extends BottomInputView implements OnItemClickListen
 		});
         touch.setAdapter(orig);
     	touchCS = (GameTableViews.myCardSet(top, top.getString(R.string.top_of_deck), touch, null));
-
+		
     	select = new Button(top);
     	select.setText(R.string.accept);
         select.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { go(); }
+            public void onClick(View v) { go(); }
         });
 
     	reset = new Button(top);
     	reset.setText(R.string.reset);
         reset.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { reset(); }
+            public void onClick(View v) { reset(); }
         });
-
+        
         TextView inst = new TextView(top);
         inst.setText(R.string.order_cards_summary);
-
+        
 		ll.setOrientation(LinearLayout.HORIZONTAL);
 		ll.addView(select);
 		ll.addView(touchCS);
@@ -111,31 +106,35 @@ public class OrderCardsView extends BottomInputView implements OnItemClickListen
 		// ll.addView(orderedCS);
 		// ll.addView(reset);
 		ll.setPadding(0, 0, 0, 15);
-
+		
     	orderCardGroups();
 	}
-
+	
 	@Override
-	public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-		int i = origGV.getPositionForView(view);
-		if (i != AdapterView.INVALID_POSITION) {
+	public void onClick(View v) {
+		int i = origGV.getPositionForView(v);
+		if (i != GridView.INVALID_POSITION) {
 			int c = origCards.get(i);
 			origCards.remove(i);
 			orderedCards.add(0, c);
 		} else {
-			i = orderedGV.getPositionForView(view);
-			if (i != AdapterView.INVALID_POSITION) {
+			i = orderedGV.getPositionForView(v);
+			if (i != GridView.INVALID_POSITION) {
 				int c = orderedCards.get(i);
 				orderedCards.remove(i);
 				origCards.add(0, c);
 			}
 		}
-
+		
 		orderCardGroups();
 	}
 	private void canSelect() {
 		select.setClickable(true);
 		select.setTextColor(Color.BLACK);
+	}
+	private void cannotSelect() {
+		select.setClickable(false);
+		select.setTextColor(Color.GRAY);
 	}
 
 	private void go() {
@@ -144,7 +143,7 @@ public class OrderCardsView extends BottomInputView implements OnItemClickListen
 		int[] is = new int[origCards.size()];
 		for (int i = 0; i < origCards.size(); i++)
 			is[i] = origCards.get(i);
-
+		
 		top.handle(new Event(Event.EType.CARDORDER).setObject(new EventObject(is)));
 	}
 	private void reset() {
@@ -156,10 +155,10 @@ public class OrderCardsView extends BottomInputView implements OnItemClickListen
 	}
 
 	@Override
-	protected View makeContentView(GameActivity activity) {
+	protected View makeContentView(Androminion top) {
 		ll = new LinearLayout(top);
 		hsv = new HorizontalScrollView(top) {
-    		@Override
+    		@Override 
     		public void onSizeChanged (int w, int h, int oldw, int oldh) {
     			LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(w, Math.max(h, oldh));
     			setLayoutParams(p);

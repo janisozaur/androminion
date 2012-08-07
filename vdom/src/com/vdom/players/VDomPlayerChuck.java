@@ -132,7 +132,7 @@ public class VDomPlayerChuck extends BasePlayer  {
         final ArrayList<Card> randList = new ArrayList<Card>();
 
         while (cost >= 0) {
-            for (final Card card : context.getCardsInGame()) {
+            for (final Card card : context.getCardsInPlay()) {
                 if (
                         card.getCost(context) != cost || 
                         !context.canBuy(card) || 

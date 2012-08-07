@@ -3,8 +3,6 @@ package com.vdom.core;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
-import java.util.List;
 
 import com.vdom.api.Card;
 import com.vdom.api.CardCostComparator;
@@ -127,7 +125,7 @@ public class Util {
      * is not always a "debug" message, but it still seems to make sense to use the term.
      */
     public static void debug(String msg, boolean interactiveAsWell) {
-        if (Game.debug || Game.junit) {
+        if (Game.debug) {
             log(msg);
         }
     }
@@ -213,12 +211,12 @@ public class Util {
         // cost++;
         // }
 
-        Card[] cards = context.getCardsInGame();
+        Card[] cards = context.getCardsInPlay();
         int cost = 0;
         while (cost < 10) {
             for (Card card : cards) {
                 if (card.getCost(context) == cost) {
-                    log("" + context.getCardsLeftInPile(card) + ":" + getLongText(card));
+                    log("" + context.getCardsLeft(card) + ":" + getLongText(card));
                     log("");
                 }
             }
@@ -380,7 +378,7 @@ public class Util {
         return false;
     }
 
-    public static ArrayList<Card> copy(CardList cards) {
+    static ArrayList<Card> copy(CardList cards) {
         if (cards == null) {
             return null;
         }
@@ -452,31 +450,5 @@ public class Util {
             return null;
         }
         return list[Game.rand.nextInt(list.length)];
-    }
-    
-	/**
-	 * Comparator for sorting by multiple attributes:
-	 * Compares with first Comparator if not equal return result
-	 * if equal use second one and repeat.
-	 * Repeat this pattern until last Comparator tried.
-	 */
-    static public class MultilevelComparator<T> implements Comparator<T> {
-    	private List<Comparator<T>> comps;
-    	
-    	public MultilevelComparator(List<Comparator<T>> comparators) {
-    		comps = comparators;
-    	}
-    	
-		@Override
-		public int compare(T arg0, T arg1) {
-			int ret = 0;
-			for(Comparator<T> cmp: comps) {
-				ret = cmp.compare(arg0, arg1);
-				if(ret != 0) {
-					return ret;
-				}
-			}
-			return ret;
-		}
     }
 }

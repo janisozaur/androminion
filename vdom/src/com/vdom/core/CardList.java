@@ -21,27 +21,22 @@ public class CardList implements Iterable<Card> {
         }
     }
 
-    public boolean checkValid() {
-    	boolean isValid = true; 
-		for (Card card : a) 
-			isValid = checkValid(card) ? isValid : false;
-		return isValid;
-    }
-
-    public boolean checkValid(Card card) {
-    	boolean isValid = true; 
-        if (card == null) {
-            Util.playerError(player, name + " contains null card.", true);
-            isValid = false;
-        } else if (((CardImpl) card).templateCard) {
-            Util.playerError(player, "Trying to add template card to " + name, true);
-            isValid = false;
+    public void checkValid() {
+        for (int i = 0; i < a.size(); i++) {
+            if (a.get(i) == null) {
+                Util.playerError(player, name + " contains null card.", true);
+            } else if (((CardImpl) a.get(i)).templateCard) {
+                Util.playerError(player, "Trying to add template card to " + name, true);
+            }
         }
-        return isValid;
     }
 
     public boolean contains(Card card) {
         return a.contains(card);
+    }
+
+    public boolean remove(Card card) {
+        return a.remove(card);
     }
 
     public Card get(int i) {
@@ -49,14 +44,13 @@ public class CardList implements Iterable<Card> {
     }
 
     public Card get(Card card) {
-        for (Card c : a) 
-            if (c.equals(card)) 
-                return c;
-        return null;
-    }
+        for (Card handCard : a) {
+            if (handCard.equals(card)) {
+                return handCard;
+            }
+        }
 
-    public boolean remove(Card card) {
-        return a.remove(card);
+        return null;
     }
 
     public Card remove(int i) {
@@ -64,7 +58,9 @@ public class CardList implements Iterable<Card> {
     }
 
     public Card remove(int i, boolean showUI) {
+
         Card card = a.remove(i);
+
         if (showUI && name.equals("Hand")) {
             MoveContext context = new MoveContext(player.game, player);
             GameEvent event = new GameEvent(GameEvent.Type.CardRemovedFromHand, context);
@@ -75,24 +71,27 @@ public class CardList implements Iterable<Card> {
         return card;
     }
 
-    public void add(Card card) {
-        add(card, false, -1);
+    public void add(int index, Card card) {
+        if (card == null) {
+            Util.playerError(player, "Trying to add null card to " + name, true);
+        } else if (((CardImpl) card).templateCard) {
+            Util.playerError(player, "Trying to add template card to " + name, true);
+        } else {
+            a.add(index, card);
+        }
     }
 
-    public void add(int index, Card card) {
-        add(card, false, index);
+    public void add(Card card) {
+        add(card, false);
     }
 
     public void add(Card card, boolean showUI) {
-        add(card, showUI, -1);
-    }
-
-    public void add(Card card, boolean showUI, int index) {
-    	if (checkValid(card)) {
-            if (index != -1)
-            	a.add(index, card);
-            else 
-            	a.add(card);
+        if (card == null) {
+            Util.playerError(player, "Trying to add null card to " + name, true);
+        } else if (((CardImpl) card).templateCard) {
+            Util.playerError(player, "Trying to add template card to " + name, true);
+        } else {
+            a.add(card);
 
             if (showUI && name.equals("Hand")) {
                 MoveContext context = new MoveContext(player.game, player);
@@ -103,7 +102,6 @@ public class CardList implements Iterable<Card> {
         }
     }
 
-
     public int size() {
         return a.size();
     }
@@ -113,7 +111,11 @@ public class CardList implements Iterable<Card> {
     }
 
     public ArrayList<Card> toArrayList() {
-    	return a;
+        ArrayList<Card> allCards = new ArrayList<Card>();
+        for (Card card : a) {
+            allCards.add(card);
+        }
+        return allCards;
     }
 
     public boolean isEmpty() {
@@ -128,11 +130,7 @@ public class CardList implements Iterable<Card> {
         return a.iterator();
     }
 
-    public int indexOf(Card card) {
+    public int indexof(Card card) {
         return a.indexOf(card);
-    }
-
-    public int lastIndexOf(Card card) {
-        return a.lastIndexOf(card);
     }
 }

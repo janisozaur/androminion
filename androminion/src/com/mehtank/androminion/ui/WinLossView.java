@@ -10,24 +10,20 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import com.mehtank.androminion.Androminion;
 import com.mehtank.androminion.R;
-import com.mehtank.androminion.util.Achievements;
 
 public class WinLossView extends FrameLayout {
 
 	public boolean statsEmpty = false;
 	
     public WinLossView(Context context) {
-    	this(context, null);
+    	super(context);
+    	init(context);
     }
     
 	public WinLossView(Context context, AttributeSet attrs) {
 		super(context, attrs);
-    	init(context);
-	}
-	
-	public WinLossView(Context context, AttributeSet attrs, int defStyle) {
-		super(context, attrs, defStyle);
     	init(context);
 	}
 	
@@ -40,7 +36,7 @@ public class WinLossView extends FrameLayout {
         ll.setOrientation(LinearLayout.VERTICAL);
         ll.setBackgroundColor(0x66000000);
         
-        Achievements achievements = new Achievements(top);
+        Achievements achievements = new Achievements((Androminion) top);
         ArrayList<String> players = achievements.getAllPlayers();
 
         ArrayList<String> humansFirst = new ArrayList<String>();

@@ -2,7 +2,6 @@ package com.mehtank.androminion.ui;
 
 import java.util.ArrayList;
 
-import com.mehtank.androminion.util.CardGroup;
 import com.vdom.comms.MyCard;
 
 import android.content.Context;
@@ -39,7 +38,7 @@ public class GameTableViews {
     	
     	if(title == null) 
     	    title = new TextView(top);
-    	title.setTextSize(10.0f);
+    	title.setTextSize((float) (title.getTextSize() * textScale));
     	title.setText(header);
     	
     	ll.addView(title);
@@ -56,6 +55,6 @@ public class GameTableViews {
 	}
 	
 	public static CardView getCardView(Context context, GameTable gt, int card) {
-		return new CardView(context, null, cardsInPlay.get(card));
+		return new CardView(context, gt, gt, null, cardsInPlay.get(card));
 	}
 }

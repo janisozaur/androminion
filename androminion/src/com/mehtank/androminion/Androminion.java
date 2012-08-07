@@ -1,4 +1,4 @@
-package com.mehtank.androminion.activities;
+package com.mehtank.androminion;
 
 import java.io.IOException;
 import java.io.StreamCorruptedException;
@@ -6,11 +6,11 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
 import java.util.Enumeration;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -18,83 +18,125 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
+import android.os.Vibrator;
 import android.preference.PreferenceManager;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
-import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.Window;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.Toast;
-import com.mehtank.androminion.BuildConfig;
-import com.mehtank.androminion.R;
+
+import com.mehtank.androminion.ui.AboutDialog;
+import com.mehtank.androminion.ui.CombinedStatsDialog;
 import com.mehtank.androminion.ui.GameTable;
 import com.mehtank.androminion.ui.HostDialog;
 import com.mehtank.androminion.ui.JoinGameDialog;
-import com.mehtank.androminion.util.HapticFeedback;
-import com.mehtank.androminion.util.ThemeSetter;
-import com.mehtank.androminion.util.HapticFeedback.AlertType;
+import com.mehtank.androminion.ui.StartGameDialog;
 import com.vdom.comms.Comms;
 import com.vdom.comms.Event;
 import com.vdom.comms.Event.EType;
-import com.vdom.comms.Event.EventObject;
 import com.vdom.comms.EventHandler;
 import com.vdom.comms.GameStatus;
 import com.vdom.comms.MyCard;
 import com.vdom.comms.NewGame;
 import com.vdom.core.Game;
 
-public class GameActivity extends Activity implements EventHandler {
+public class Androminion extends Activity implements EventHandler {
+	protected static final int MENU_LOCAL_START = 31;
+	protected static final int MENU_REMOTE_START = 32;
+	protected static final int MENU_INVITE = 33;
+	protected static final int MENU_SETTINGS = 40;
+	protected static final int MENU_HELP = 50;
+	protected static final int MENU_ABOUT = 60;
+    protected static final int MENU_RESTART = 70;
+    protected static final int MENU_MAIN = 80;
+	protected static final int MENU_QUIT = 90;
+	protected static final int MENU_ACHIEVEMENTS = 100;
+    protected static final int MENU_STATS = 110;
+	
+	private static final boolean DEBUGGING = false;
+	public static boolean NOTOASTS = false;
+
 	static final boolean MULTIPLAYER = false;
 
-	private GameActivity top = this;
+	String[] cardsPassedInExtras;
+	
+	protected Androminion top = this;
+	
+	FrameLayout topView;
 
-	private FrameLayout topView;
-	private GameTable gt;
-	private View splash;
+	Vibrator v;
 
-	private boolean gameRunning = false;
-	private long lastBackClick = 0;
+	GameTable gt;
+	View splash;
 
-	private Comms comm;
-	private Thread commThread;
-	private boolean gotQuit = false;
+	boolean gameRunning = false;
+
+	Comms comm;
+	Thread commThread;
+	boolean gotQuit = false;
 
 	public static final String DEFAULT_NAME = "You";
 	public static final String DEFAULT_HOST = "localhost";
 	public static final int DEFAULT_PORT = 1251;
-
-	private String name;
-	private String host;
-	private int port;
-
+	String name;
+	String host;
+	int port;
+	
 	// for invites
-	private String serverName;
-	private String serverHost;
-	private int serverPort;
-
+	protected String serverName;
+	protected String serverHost;
+	protected int serverPort;
+	
+	/** Called when the activity is first created. */
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
-		ThemeSetter.set(this);
-		super.onCreate(savedInstanceState);
+		SharedPreferences prefs;
+		PreferenceManager.setDefaultValues(this, R.xml.preferences, false);
 
+		super.onCreate(savedInstanceState);
+		
+		Intent intent = getIntent();
+		if(intent != null) {
+		    Bundle extras = intent.getExtras();
+		    if(extras != null) {
+		        cardsPassedInExtras = getIntent().getExtras().getStringArray("cards");
+		    }
+		}
+
+		debug("Dominion onCreate called!");
+
+		requestWindowFeature(Window.FEATURE_NO_TITLE);
+		
 		getWindow().setSoftInputMode(
 				WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
 
-		topView = (FrameLayout) getLayoutInflater().inflate(R.layout.gameactivity, null);
-		setContentView(topView);
-		gt = (GameTable) findViewById(R.id.gameTable);
-		splash = findViewById(R.id.splash);
+		topView = new FrameLayout(this);
 
-		SharedPreferences prefs;
+		gt = new GameTable(this);
+		FrameLayout.LayoutParams p = new FrameLayout.LayoutParams(
+				FrameLayout.LayoutParams.FILL_PARENT,
+				FrameLayout.LayoutParams.FILL_PARENT);
+		topView.addView(gt, p);
+
+		splash = getLayoutInflater().inflate(R.layout.splashview, null);
+		topView.addView(splash);
+
+		setContentView(topView);
+
+		v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+
 		prefs = PreferenceManager.getDefaultSharedPreferences(top);
 		name = prefs.getString("name", DEFAULT_NAME);
-
+		
 		startServer();
 
-		Bundle extras = getIntent().getExtras();
+		Bundle extras = getIntent().getExtras(); 
 		if(extras !=null) {
 			host = extras.getString("host");
 			port = extras.getInt("port");
@@ -105,7 +147,7 @@ public class GameActivity extends Activity implements EventHandler {
 				return;
 			}
 		}
-
+		
 		host = prefs.getString("host", DEFAULT_HOST);
 		port = prefs.getInt("port", DEFAULT_PORT);
 
@@ -114,35 +156,31 @@ public class GameActivity extends Activity implements EventHandler {
 			edit.putString("LastVersion", getString(R.string.version));
 			edit.commit();
 
-			//new AboutDialog(this, true);
+			new AboutDialog(this, true);
 		}
-
+		
 		// ds = new DominionServer(top);
 		// quickstart();
-
-		if(savedInstanceState == null) {
-			if(getIntent().hasExtra("command")) {
-				ArrayList<String> strs = getIntent().getStringArrayListExtra("command");
-				handle(new Event(Event.EType.STARTGAME)
-				.setObject(new EventObject(strs.toArray(new String[0]))));
-			} else if (getIntent().hasExtra("cards")) {
-				Intent i = new Intent(this,StartGameActivity.class);
-				i.putExtras(getIntent());
-				startActivityForResult(i, 0);
-			}
-		}
 	}
-
-	@Override
+	
+	@Override 
 	public void onResume() {
 		super.onResume();
 		debug("onResume called");
+		
+		NOTOASTS = getPref("toastsoff");
+		
+		if (!getPref("statusbar"))
+			getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
+				WindowManager.LayoutParams.FLAG_FULLSCREEN);
+		else
+			getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
 	}
-
-	boolean getPref(String prefName) {
+	
+	boolean getPref(String name) {
 		SharedPreferences prefs;
 		prefs = PreferenceManager.getDefaultSharedPreferences(top);
-		return prefs.getBoolean(prefName, false);
+		return prefs.getBoolean(name, false);
 	}
 
 	void startServer() {
@@ -151,59 +189,110 @@ public class GameActivity extends Activity implements EventHandler {
 	void stopServer() {
 		stopService(new Intent("com.mehtank.androminion.SERVER"));
 	}
-
-	public void quickstart() {
+	
+	public void quickstart() {	
 		// startServer();
 		host = "localhost";
 		startGame(port);
 	}
 
 	@Override
-	public boolean onCreateOptionsMenu(Menu menu) {
-	    MenuInflater inflater = getMenuInflater();
-	    inflater.inflate(R.menu.game_menu, menu);
-	    return super.onCreateOptionsMenu(menu);
-	}
-
-	@Override
 	public boolean onPrepareOptionsMenu(Menu menu) {
-		if(gameRunning) {
-			menu.findItem(R.id.startgame_menu).setVisible(false);
-			menu.findItem(R.id.help_menu).setVisible(true);
-		} else {
-			menu.findItem(R.id.startgame_menu).setVisible(true);
-			menu.findItem(R.id.help_menu).setVisible(false);
-		}
-		return super.onPrepareOptionsMenu(menu);
+		menu.clear();
+		createMenu(menu);
+		return super.onCreateOptionsMenu(menu);
 	}
 
-	@Override
-	public boolean onOptionsItemSelected (MenuItem item) {
-		super.onOptionsItemSelected(item);
-		switch (item.getItemId()) {
-		case R.id.startgame_menu:
-			quickstart();
-			return true;
-		case R.id.help_menu:
-			gt.showHelp(1);
-			break;
-		case R.id.settings_menu:
-			startActivity(new Intent(this, SettingsActivity.class));
-			return true;
-		case R.id.about_menu:
-			startActivity(new Intent(this, AboutActivity.class));
-			return true;
-        case R.id.stats_menu:
-        	startActivity(new Intent(this, CombinedStatsActivity.class));
-        	return true;
-		case R.id.quit_menu:
-			finish();
-			return true;
-		}
-		return false;
-	}
+    public void createMenu(Menu menu) {
+        if (gameRunning) {
+            MenuItem helpMenu = menu.add(Menu.NONE, MENU_HELP, Menu.NONE, R.string.help_menu);
+            helpMenu.setIcon(android.R.drawable.ic_menu_help);
+        } else {
+            MenuItem localMenu = menu.add(Menu.NONE, MENU_LOCAL_START, Menu.NONE, R.string.start_game_menu);
+            localMenu.setIcon(android.R.drawable.ic_menu_slideshow);
+        }
+        
+        MenuItem settingsMenu = menu.add(Menu.NONE, MENU_SETTINGS, Menu.NONE, R.string.settings_menu);
+        settingsMenu.setIcon(android.R.drawable.ic_menu_preferences);
+
+        MenuItem aboutMenu = menu.add(Menu.NONE, MENU_ABOUT, Menu.NONE,
+            R.string.about_menu); 
+        aboutMenu.setIcon(android.R.drawable.ic_menu_info_details);
+
+//        MenuItem achievmentsMenu = menu.add(Menu.NONE, MENU_ACHIEVEMENTS, Menu.NONE,
+//            R.string.achievements_menu); 
+//        achievmentsMenu.setIcon(android.R.drawable.ic_menu_myplaces);
+        
+        MenuItem statsMenu = menu.add(Menu.NONE, MENU_STATS, Menu.NONE,
+            R.string.stats_menu); 
+        statsMenu.setIcon(android.R.drawable.ic_menu_myplaces);
+        
+        if (gameRunning) {
+//            MenuItem restartMenu = menu.add(Menu.NONE, MENU_RESTART, Menu.NONE,
+//                    "Restart"); 
+//            restartMenu.setIcon(android.R.drawable.ic_menu_rotate);
+//    
+//            MenuItem mainMenuMenu = menu.add(Menu.NONE, MENU_MAIN, Menu.NONE,
+//                    "Main Menu");
+//            mainMenuMenu.setIcon(android.R.drawable.ic_menu_revert);
+        }
+        
+        MenuItem quitMenu = menu.add(Menu.NONE, MENU_QUIT, Menu.NONE,
+                R.string.quit_menu);
+        quitMenu.setIcon(android.R.drawable.ic_menu_close_clear_cancel);
+    } 
 
     protected void invite() {};
+
+	@Override
+	public boolean onMenuItemSelected(int panelId, MenuItem item) {
+		switch (item.getItemId()) {
+		case MENU_LOCAL_START:
+			quickstart();
+			break;
+		case MENU_REMOTE_START:
+			new HostDialog(this, "", DEFAULT_PORT);
+			break;
+		case MENU_INVITE:
+			// TODO: alert("Server status:", ds.test());
+			invite();
+			break;
+		case MENU_ABOUT:
+			// alert("About Androminion:", "It's awesome.");
+			new AboutDialog(this);
+			break;
+//        case MENU_ACHIEVEMENTS:
+//            new AchievementsView(this);
+//            break;
+        case MENU_STATS:
+            new CombinedStatsDialog(this);
+            break;
+		case MENU_HELP:
+			 // Uri uri = Uri.parse("http://android.mehtank.com/help.html");
+			 // Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+			 // startActivity(intent);				
+			gt.showHelp(1);
+			break;
+        case MENU_MAIN:
+            break;
+        case MENU_RESTART:
+            break;
+		case MENU_QUIT:
+			// TODO: alert("Disconnected! (Hopefully)", ds.test());
+			onDestroy();
+			break;
+			
+		case MENU_SETTINGS:
+			// Launch Prefs activity
+			Intent i = new Intent(this, SettingsActivity.class);
+			startActivity(i);
+			debug("Settings called");
+			break;
+		}
+		return true;
+	}
+
+	long lastBackClick = 0;
 
 	@Override
 	public boolean onKeyDown(int keyCode, KeyEvent event) {
@@ -211,10 +300,11 @@ public class GameActivity extends Activity implements EventHandler {
 		    if (getPref("exitonback")) {
     		    long now = System.currentTimeMillis();
     			if (now - lastBackClick < 3000) // 3 seconds
-    				finish();
+    				onDestroy();
     			else {
     				lastBackClick = now;
-    				Toast.makeText(top, getString(R.string.toast_quitconfirm), Toast.LENGTH_SHORT).show();
+    				if (!NOTOASTS) Toast.makeText(top, getString(R.string.toast_quitconfirm), Toast.LENGTH_SHORT)
+    						.show();
     			}
     			return true;
 		    } else {
@@ -231,7 +321,7 @@ public class GameActivity extends Activity implements EventHandler {
 		disconnect();
 		stopServer();
 		super.onDestroy();
-		//System.exit(0);
+		System.exit(0);
 	}
 
 	public void addView(View v) {
@@ -240,15 +330,49 @@ public class GameActivity extends Activity implements EventHandler {
 
 	public void nosplash() {
 		if (splash != null)
-			splash.setVisibility(View.INVISIBLE);
+			splash.setVisibility(LinearLayout.INVISIBLE);
 	}
 
 	public void splash() {
 		if (splash != null)
-			splash.setVisibility(View.VISIBLE);
+			splash.setVisibility(LinearLayout.VISIBLE);
 	}
 
+	public static enum AlertType {
+		CHAT, TURNBEGIN, SELECT, CLICK, LONGCLICK, FINAL,
+	};
 
+	public void alert(AlertType t) {
+		if (!getPref("allvibeson"))
+			return;
+		
+		switch (t) {
+		case CHAT:
+			if (getPref("chatvibeon"))
+				v.vibrate(new long[] { 0, 40, 100, 40 }, -1);
+			break;
+		case TURNBEGIN:
+			if (getPref("turnvibeon"))
+				v.vibrate(new long[] { 0, 50, 20, 40, 20, 30 }, -1);
+			break;
+		case SELECT:
+			if (getPref("actionvibeon"))
+				v.vibrate(75);
+			break;
+		case CLICK:
+			if (getPref("clickvibeon"))
+				v.vibrate(20);
+			break;
+		case LONGCLICK:
+			if (getPref("clickvibeon"))
+				v.vibrate(40);
+			break;
+		case FINAL:
+			if (getPref("gamevibeon"))
+				v.vibrate(250);
+			break;
+		}
+	}
 
 	protected void alert(String title, String message) {
 		new AlertDialog.Builder(this)
@@ -256,21 +380,23 @@ public class GameActivity extends Activity implements EventHandler {
 				.setMessage(message)
 				.setPositiveButton(android.R.string.ok,
 						new DialogInterface.OnClickListener() {
-							@Override
 							public void onClick(DialogInterface dialog,
 									int whichButton) {
-								dialog.dismiss();
 							}
 						}).show();
 	}
 
 	static final int MESSAGE_EVENT = 0;
-	public static final String BASEDIR = Environment.getExternalStorageDirectory().getPath() + "/Androminion";
+	public static final String BASEDIR;
+	static {
+		BASEDIR = Environment.getExternalStorageDirectory().getPath() + "/Androminion";
+	}
 
 	@Override
 	public void debug(String s) {
-		if (BuildConfig.DEBUG)
-			Log.d("Androminion", s);
+		if (DEBUGGING)
+			System.err.println(s);
+		// Log.w("Dominion", s);
 	}
 
 	@Override
@@ -299,19 +425,29 @@ public class GameActivity extends Activity implements EventHandler {
 
 			case NEWGAME:
 				NewGame ng = e.o.ng;
-				splash();
 
+				int index = topView.indexOfChild(gt);
+				topView.removeView(gt);
+				gt = new GameTable(top);
+				
+				FrameLayout.LayoutParams p = new FrameLayout.LayoutParams(
+						FrameLayout.LayoutParams.FILL_PARENT,
+						FrameLayout.LayoutParams.FILL_PARENT);
+
+				topView.addView(gt, index, p);
+				splash();
+				
 				saveLastCards(ng.cards);
 				gt.newGame(ng.cards, ng.players);
 				gameRunning = true;
-
+				
 		        PreferenceManager.getDefaultSharedPreferences(top).registerOnSharedPreferenceChangeListener(gt);
 				break;
 
 			// during game
 			case CHAT:
-				HapticFeedback.vibrate(top, AlertType.CHAT);
-				Toast.makeText(top, e.s, Toast.LENGTH_LONG).show();
+				alert(AlertType.CHAT);
+				if (!NOTOASTS) Toast.makeText(top, e.s, Toast.LENGTH_LONG).show();
 				break;
 
 			case CARDOBTAINED:
@@ -381,7 +517,7 @@ public class GameActivity extends Activity implements EventHandler {
 			    gt.achieved(e.s);
 			    ack = true;
 			    break;
-
+			    
 			case DEBUG:
 				debug(e.s);
 				break;
@@ -404,17 +540,17 @@ public class GameActivity extends Activity implements EventHandler {
 			gt.setStatus(gs, e.s, e.b);
 		}
 	};
-
+	
 	private void saveLastCards(MyCard[] cards) {
 		SharedPreferences prefs;
 		prefs = PreferenceManager.getDefaultSharedPreferences(top);
 		SharedPreferences.Editor edit = prefs.edit();
 		edit.putInt("LastCardCount", cards.length);
-
+		
 		int i=0;
 		for (MyCard c : cards)
 			edit.putString("LastCard" + i++, (c.isBane ? Game.BANE : "") + c.originalSafeName);
-
+			
 		edit.commit();
 	}
 
@@ -474,15 +610,15 @@ public class GameActivity extends Activity implements EventHandler {
 	private void saveHostPort() {
 		SharedPreferences prefs;
 		prefs = PreferenceManager.getDefaultSharedPreferences(top);
-
+		
 		SharedPreferences.Editor edit = prefs.edit();
 		edit.putString("host", host);
 		edit.putInt("port", port);
 		edit.commit();
 	}
-
+	
 	private void startGame(int p) {
-
+		
 		try {
 			if (!connect(p))
 				return;
@@ -503,7 +639,7 @@ public class GameActivity extends Activity implements EventHandler {
 			serverName = name;
 			serverHost = getLocalIpAddress();
 			serverPort = DEFAULT_PORT;
-
+			
 			put( new Event( EType.HELLO ).setString( name ) );
             final Event e = comm.get();
             if (e == null) {
@@ -527,10 +663,10 @@ public class GameActivity extends Activity implements EventHandler {
 
 	public String getLocalIpAddress() {
 		try {
-			for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces();
+			for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); 
 					en.hasMoreElements();) {
 				NetworkInterface intf = en.nextElement();
-				for (Enumeration<InetAddress> enumIpAddr = intf.getInetAddresses();
+				for (Enumeration<InetAddress> enumIpAddr = intf.getInetAddresses(); 
 						enumIpAddr.hasMoreElements();) {
 					InetAddress inetAddress = enumIpAddr.nextElement();
 					if (!inetAddress.isLoopbackAddress()) {
@@ -557,22 +693,7 @@ public class GameActivity extends Activity implements EventHandler {
 //			.setObject(new String[] { "Random", "Human Player",
 //					"Drew (AI)", "Earl (AI)" }));
 
-		Intent i = new Intent(this,StartGameActivity.class);
-		if(getIntent().hasExtra("cards")) {
-			i.putExtras(getIntent());
-		}
-		startActivityForResult(i, 0);
-	       //new StartGameDialog(top, e, MULTIPLAYER, cardsPassedInExtras);
-	}
-
-	@Override
-	protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-		//Result of StartGameActivity
-		if(requestCode == 0 && resultCode == RESULT_OK && data.hasExtra("command")) {
-			ArrayList<String> strs = data.getStringArrayListExtra("command");
-			handle(new Event(Event.EType.STARTGAME)
-			.setObject(new EventObject(strs.toArray(new String[0]))));
-			Toast.makeText(top, top.getString(R.string.toast_starting), Toast.LENGTH_SHORT).show();
-		}
+	    
+	       new StartGameDialog(top, e, MULTIPLAYER, cardsPassedInExtras);
 	}
 }

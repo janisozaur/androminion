@@ -6,14 +6,7 @@
 
 
 	<string name="ui_pref_title">Oberfläche</string>
-	<string name="pref_theme_title">Design</string>
-	<string name="pref_theme_summary">Wähle unterschiedliche Designs</string>
-	<string-array name="theme_names">
-		<item>Dunkel</item>
-		<item>Dunkel mit Statusleiste</item>
-		<item>Hell</item>
-		<item>Hell mit Statusleiste</item>
-	</string-array>
+	<string name="statusbar_pref_title">Statusanzeige aktiv</string>
 	<string name="abc_header_pref_title">Zeige schnelle Infos</string>
 	<string name="abc_header_pref_summary">Zeige Anzahl der Aktionen, Käufe und Münzen oben an</string>
 	<string name="one_turn_logs_pref_title">Details eines Zuges</string>
@@ -22,6 +15,8 @@
 	<string name="hide_card_counts_pref_summary">(wirksam mit nächstem Spiel)</string>
 	<string name="exitonback_pref_title">Ende mit Zurückknopf</string>
 	<string name="exitonback_pref_summary">Beendet das Spiel erst, wenn der Zurückknopf erneut gedrückt wird</string>
+	<string name="toastsoff_pref_title">Toasts ausschalten</string>
+	<string name="toastsoff_pref_summary">Die Option Toast ausschalten nur wählen wenn das Spiel VOR dem Start abstürzt</string>
 	<string name="showenglishnames_pref_title">Englische Namen</string>
 	<string name="showenglishnames_pref_summary">Zeige die Englischen Namen der Karten in Klammern an</string>
 
